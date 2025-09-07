@@ -4,7 +4,6 @@ const { PrismaClient } = require("../generated/prisma");
 const router = express.Router();
 const prisma = new PrismaClient();
 
-//specific PUT route
 router.put("/deactivate/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -19,11 +18,12 @@ router.put("/deactivate/:id", async (req, res) => {
   }
 });
 
-//general PUT route
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, director, releaseYear, description, rating } = req.body;
+    const { title, director, releaseYear, description, rating, genres } =
+      req.body;
+
     const updatedMovie = await prisma.movie.update({
       where: { id: Number(id) },
       data: {
@@ -32,8 +32,18 @@ router.put("/:id", async (req, res) => {
         releaseYear: Number(releaseYear),
         description,
         rating: rating ? Number(rating) : undefined,
+        movieGenres: genres?.length
+          ? {
+              deleteMany: {}, // remove old genres
+              create: genres.map((genreId) => ({
+                genre: { connect: { id: genreId } },
+              })),
+            }
+          : undefined,
       },
+      include: { movieGenres: { include: { genre: true } } },
     });
+
     res.json(updatedMovie);
   } catch (error) {
     console.error("Error updating movie:", error);
@@ -41,15 +51,12 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-//GET all movies with search
 router.get("/", async (req, res) => {
   try {
     const { title } = req.query;
 
     const findManyOptions = {
-      where: {
-        status: true,
-      },
+      where: { status: true },
       include: { movieGenres: { include: { genre: true } } },
     };
 
@@ -70,16 +77,16 @@ router.get("/", async (req, res) => {
   }
 });
 
-//GET movie by ID
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const movie = await prisma.movie.findUnique({
       where: { id: Number(id) },
+      include: { movieGenres: { include: { genre: true } } },
     });
-    if (!movie) {
-      return res.status(404).json({ error: "Movie not found" });
-    }
+
+    if (!movie) return res.status(404).json({ error: "Movie not found" });
+
     res.json(movie);
   } catch (error) {
     console.error("Error fetching movie:", error);
@@ -99,6 +106,7 @@ router.post("/", async (req, res) => {
       title,
       director,
       releaseYear: Number(releaseYear),
+      description,
       rating: rating ? Number(rating) : null,
       movieGenres: genres?.length
         ? {

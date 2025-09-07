@@ -19,6 +19,24 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ✅ GET single genre by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const genre = await prisma.genre.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!genre) return res.status(404).json({ error: "Genre not found" });
+
+    res.json(genre);
+  } catch (error) {
+    console.error("Error fetching genre", error);
+    res.status(500).json({ error: "Failed to fetch genre" });
+  }
+});
+
+// ✅ Create a new genre
 router.post("/", async (req, res) => {
   try {
     const { name } = req.body;
@@ -42,6 +60,7 @@ router.post("/", async (req, res) => {
   }
 });
 
+// ✅ Update genre status (active/inactive)
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
