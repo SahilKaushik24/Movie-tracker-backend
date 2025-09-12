@@ -1,5 +1,6 @@
 const express = require("express");
 const { PrismaClient } = require("../generated/prisma");
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -19,7 +20,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ✅ GET single genre by ID
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -36,7 +36,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ✅ Create a new genre
+// Create a new genre
 router.post("/", async (req, res) => {
   try {
     const { name } = req.body;
@@ -60,7 +60,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ✅ Update genre status (active/inactive)
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;

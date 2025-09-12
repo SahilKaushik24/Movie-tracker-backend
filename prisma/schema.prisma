@@ -3,7 +3,6 @@
 
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -15,6 +14,16 @@ datasource db {
 }
 
 // schema.prisma
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String?
+  password  String
+  createdAt DateTime  @default(now())
+
+  watched   Watched[]
+}
+
 model Movie {
   id          Int     @id @default(autoincrement())
   title       String
@@ -24,23 +33,37 @@ model Movie {
   description String?
   rating      Float?
 
-  movieGenres      MovieGenre[]
+  movieGenres MovieGenre[]
+  watched     Watched[]
 }
 
 model Genre {
-  id          Int     @id @default(autoincrement())
-  name        String
-  status      Boolean @default(true)
+  id     Int     @id @default(autoincrement())
+  name   String
+  status Boolean @default(true)
 
   movieGenres MovieGenre[]
 }
 
 model MovieGenre {
-  id          Int     @id @default(autoincrement())
-  movieId     Int
-  genreId     Int
-  status      Boolean @default(true)
+  id      Int     @id @default(autoincrement())
+  movieId Int
+  genreId Int
+  status  Boolean @default(true)
 
-  movie       Movie   @relation(fields: [movieId], references: [id])
-  genre       Genre   @relation(fields: [genreId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+  genre Genre @relation(fields: [genreId], references: [id])
+}
+
+model Watched {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  movieId   Int
+  rating    Int?
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])
 }

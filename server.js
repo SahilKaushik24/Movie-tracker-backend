@@ -8,6 +8,7 @@ app.use(express.json());
 
 const movieRoutes = require("./routes/movies");
 const genresRoutes = require("./routes/genres");
+const watchedRoutes = require("./routes/watched");
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");
@@ -15,6 +16,7 @@ app.get("/", (req, res) => {
 
 app.use("/movies", movieRoutes);
 app.use("/genres", genresRoutes);
+app.use("/watched", watchedRoutes);
 
 const PORT = 5000;
 app.listen(PORT, () => {
