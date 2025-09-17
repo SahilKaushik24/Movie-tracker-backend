@@ -1,99 +1,74 @@
-const express = require("express");
-const { PrismaClient } = require("../generated/prisma");
-
-const prisma = new PrismaClient();
+import express from "express";
+import { PrismaClient } from "../generated/prisma/index.js";
 const router = express.Router();
+const prisma = new PrismaClient();
 
-router.post("/", async (req, res) => {
-  try {
-    const { userId, movieId, rating } = req.body;
-
-    if (!userId || !movieId) {
-      return res.status(400).json({ error: "userId and movieId are required" });
-    }
-
-    const watched = await prisma.watched.create({
-      data: {
-        user: { connect: { id: userId } },
-        movie: { connect: { id: movieId } },
-        rating,
-      },
-      include: {
-        movie: {
-          include: {
-            movieGenres: { include: { genre: true } },
-          },
-        },
-      },
-    });
-
-    res.json({
-      id: watched.movie.id,
-      title: watched.movie.title,
-      releaseYear: watched.movie.releaseYear,
-      director: watched.movie.director,
-      rating: watched.movie.rating,
-      genres: watched.movie.movieGenres.map((g) => g.genre.name),
-      poster: watched.movie.poster || "/placeholder.png",
-      userRating: watched.rating,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to add watched movie" });
-  }
-});
-
+// GET watched movies for a user
 router.get("/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
+  const { userId } = req.params;
 
+  try {
     const watchedMovies = await prisma.watched.findMany({
-      where: { userId: Number(userId) },
+      where: { userId: Number(userId), isDeleted: false },
       include: {
         movie: {
           include: {
-            movieGenres: { include: { genre: true } },
+            movieGenres: {
+              include: {
+                genre: true,
+              },
+            },
           },
         },
       },
     });
 
-    const mapped = watchedMovies.map((w) => ({
-      id: w.movie.id,
-      title: w.movie.title,
-      releaseYear: w.movie.releaseYear,
-      director: w.movie.director,
-      rating: w.movie.rating,
-      genres: w.movie.movieGenres.map((g) => g.genre.name),
-      poster: w.movie.poster || "/placeholder.png",
-      userRating: w.rating,
-    }));
-
-    res.json(mapped);
+    res.json(watchedMovies);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching watched movies:", err);
     res.status(500).json({ error: "Failed to fetch watched movies" });
   }
 });
 
-router.delete("/:userId/:movieId", async (req, res) => {
-  try {
-    const { userId, movieId } = req.params;
+/**
+ * ADD a new watched movie
+ */
+router.post("/", async (req, res) => {
+  const { userId, movieId, rating } = req.body;
 
-    await prisma.watched.delete({
-      where: {
-        userId_movieId: {
-          userId: Number(userId),
-          movieId: Number(movieId),
-        },
+  try {
+    const watched = await prisma.watched.create({
+      data: {
+        userId: Number(userId),
+        movieId: Number(movieId),
+        rating: rating ? Number(rating) : null,
       },
+      include: { movie: true },
     });
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
+    res.status(201).json(watched);
+  } catch (error) {
+    console.error("Error adding watched movie:", error);
+    res.status(500).json({ error: "Failed to save watched movie" });
+  }
+});
+
+/**
+ * DELETE a watched movie by watchedId
+ */
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deleted = await prisma.watched.delete({
+      where: { id: Number(id) },
+    });
+
+    res.json({ message: "Watched movie deleted successfully", deleted });
+  } catch (error) {
+    console.error("Error deleting watched movie:", error);
     res.status(500).json({ error: "Failed to delete watched movie" });
   }
 });
 
-module.exports = router;
+export default router;

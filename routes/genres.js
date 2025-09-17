@@ -1,6 +1,5 @@
-const express = require("express");
-const { PrismaClient } = require("../generated/prisma");
-
+import express from "express";
+import { PrismaClient } from "../generated/prisma/index.js";
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -36,7 +35,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Create a new genre
 router.post("/", async (req, res) => {
   try {
     const { name } = req.body;
@@ -77,4 +75,4 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

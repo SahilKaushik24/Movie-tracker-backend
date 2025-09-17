@@ -1,14 +1,14 @@
-const express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
+import movieRoutes from "./routes/movies.js";
+import genresRoutes from "./routes/genres.js";
+import watchedRoutes from "./routes/watched.js";
+import authRouter from "./routes/auth.js";
 
 const app = express();
 app.use(cors());
 
 app.use(express.json());
-
-const movieRoutes = require("./routes/movies");
-const genresRoutes = require("./routes/genres");
-const watchedRoutes = require("./routes/watched");
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");
@@ -17,8 +17,9 @@ app.get("/", (req, res) => {
 app.use("/movies", movieRoutes);
 app.use("/genres", genresRoutes);
 app.use("/watched", watchedRoutes);
+app.use("/auth", authRouter);
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
