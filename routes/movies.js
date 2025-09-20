@@ -20,8 +20,7 @@ router.put("/deactivate/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, director, releaseYear, description, rating, genres } =
-      req.body;
+    const { title, director, releaseYear, overview, rating, genres } = req.body;
 
     const updatedMovie = await prisma.movie.update({
       where: { id: Number(id) },
@@ -29,7 +28,7 @@ router.put("/:id", async (req, res) => {
         title,
         director,
         releaseYear: Number(releaseYear),
-        description,
+        overview,
         rating: rating ? Number(rating) : undefined,
         movieGenres: genres?.length
           ? {
@@ -95,8 +94,7 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { title, director, releaseYear, description, rating, genres } =
-      req.body;
+    const { title, director, releaseYear, overview, rating, genres } = req.body;
     if (!title || !director || !releaseYear) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -105,7 +103,7 @@ router.post("/", async (req, res) => {
       title,
       director,
       releaseYear: Number(releaseYear),
-      description,
+      overview,
       rating: rating ? Number(rating) : null,
       movieGenres: genres?.length
         ? {
