@@ -28,8 +28,12 @@ model Movie {
   director    String
   releaseYear Int
   status      Boolean @default(true)
-  description String?
+  overview String?
   rating      Float?
+  posterPath  String?
+  runtime     Int?
+  language    String?
+  budget      Int?
 
   movieGenres MovieGenre[]
   watched     Watched[]

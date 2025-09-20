@@ -1,22 +1,20 @@
 import express from "express";
 import { PrismaClient } from "../generated/prisma/index.js";
+import { authenticateToken } from "../middleware/middleware.js";
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// GET watched movies for a user
-router.get("/:userId", async (req, res) => {
-  const { userId } = req.params;
-
+//watched movies for logged-in user
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const watchedMovies = await prisma.watched.findMany({
-      where: { userId: Number(userId), isDeleted: false },
+      where: { userId: req.user.userId, isDeleted: false }, // FIXED
       include: {
         movie: {
           include: {
             movieGenres: {
-              include: {
-                genre: true,
-              },
+              include: { genre: true },
             },
           },
         },
@@ -30,21 +28,46 @@ router.get("/:userId", async (req, res) => {
   }
 });
 
-/**
- * ADD a new watched movie
- */
-router.post("/", async (req, res) => {
-  const { userId, movieId, rating } = req.body;
+// add a watched movie
+router.post("/", authenticateToken, async (req, res) => {
+  const { movieId, rating } = req.body;
 
   try {
-    const watched = await prisma.watched.create({
-      data: {
-        userId: Number(userId),
+    // Check if already exists
+    const existing = await prisma.watched.findFirst({
+      where: {
+        userId: req.user.userId, // FIXED
         movieId: Number(movieId),
-        rating: rating ? Number(rating) : null,
       },
-      include: { movie: true },
     });
+
+    let watched;
+    if (existing) {
+      if (existing.isDeleted) {
+        // Reactivate soft-deleted movie
+        watched = await prisma.watched.update({
+          where: { id: existing.id },
+          data: {
+            isDeleted: false,
+            rating: rating ? Number(rating) : null,
+            createdAt: new Date(),
+          },
+          include: { movie: true },
+        });
+      } else {
+        return res.status(400).json({ error: "Movie already in watched list" });
+      }
+    } else {
+      // Create new entry
+      watched = await prisma.watched.create({
+        data: {
+          userId: req.user.userId, // FIXED
+          movieId: Number(movieId),
+          rating: rating ? Number(rating) : null,
+        },
+        include: { movie: true },
+      });
+    }
 
     res.status(201).json(watched);
   } catch (error) {
@@ -53,18 +76,28 @@ router.post("/", async (req, res) => {
   }
 });
 
-/**
- * DELETE a watched movie by watchedId
- */
-router.delete("/:id", async (req, res) => {
+// soft delete watched movie
+router.delete("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const deleted = await prisma.watched.delete({
+    const watched = await prisma.watched.findUnique({
       where: { id: Number(id) },
     });
 
-    res.json({ message: "Watched movie deleted successfully", deleted });
+    // FIXED: check against req.user.userId
+    if (!watched || watched.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ error: "Not allowed to delete this movie" });
+    }
+
+    const deleted = await prisma.watched.update({
+      where: { id: Number(id) },
+      data: { isDeleted: true },
+    });
+
+    res.json({ message: "Watched movie removed (soft delete)", deleted });
   } catch (error) {
     console.error("Error deleting watched movie:", error);
     res.status(500).json({ error: "Failed to delete watched movie" });
