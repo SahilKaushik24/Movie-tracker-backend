@@ -1,105 +1,95 @@
 import express from "express";
 import { PrismaClient } from "../generated/prisma/index.js";
 import { authenticateToken } from "../middleware/middleware.js";
+import { getPosterUrl } from "../utils.js";
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-//watched movies for logged-in user
+// GET watched movies
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const watchedMovies = await prisma.watched.findMany({
-      where: { userId: req.user.userId, isDeleted: false }, // FIXED
-      include: {
-        movie: {
-          include: {
-            movieGenres: {
-              include: { genre: true },
-            },
-          },
-        },
-      },
+      where: { userId: req.user.userId, isDeleted: false },
+      include: { movie: true },
     });
 
-    res.json(watchedMovies);
+    const moviesWithPoster = watchedMovies.map((w) => ({
+      ...w,
+      movie: {
+        ...w.movie,
+        poster: getPosterUrl(w.movie.poster_path),
+      },
+    }));
+
+    res.json(moviesWithPoster);
   } catch (err) {
-    console.error("Error fetching watched movies:", err);
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch watched movies" });
   }
 });
 
-// add a watched movie
+// POST watched movie
 router.post("/", authenticateToken, async (req, res) => {
   const { movieId, rating } = req.body;
-
   try {
-    // Check if already exists
     const existing = await prisma.watched.findFirst({
-      where: {
-        userId: req.user.userId, // FIXED
-        movieId: Number(movieId),
-      },
+      where: { userId: req.user.userId, movieId: Number(movieId) },
     });
 
     let watched;
     if (existing) {
       if (existing.isDeleted) {
-        // Reactivate soft-deleted movie
         watched = await prisma.watched.update({
           where: { id: existing.id },
-          data: {
-            isDeleted: false,
-            rating: rating ? Number(rating) : null,
-            createdAt: new Date(),
-          },
-          include: { movie: true },
+          data: { isDeleted: false, rating: rating ? Number(rating) : null },
         });
       } else {
         return res.status(400).json({ error: "Movie already in watched list" });
       }
     } else {
-      // Create new entry
       watched = await prisma.watched.create({
         data: {
-          userId: req.user.userId, // FIXED
+          userId: req.user.userId,
           movieId: Number(movieId),
           rating: rating ? Number(rating) : null,
         },
-        include: { movie: true },
       });
     }
 
-    res.status(201).json(watched);
-  } catch (error) {
-    console.error("Error adding watched movie:", error);
+    const movie = await prisma.movie.findUnique({
+      where: { id: Number(movieId) },
+    });
+    res
+      .status(201)
+      .json({
+        ...watched,
+        movie: { ...movie, poster: getPosterUrl(movie.poster_path) },
+      });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to save watched movie" });
   }
 });
 
-// soft delete watched movie
+// DELETE watched (soft delete)
 router.delete("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
-
   try {
     const watched = await prisma.watched.findUnique({
       where: { id: Number(id) },
     });
-
-    // FIXED: check against req.user.userId
-    if (!watched || watched.userId !== req.user.userId) {
-      return res
-        .status(403)
-        .json({ error: "Not allowed to delete this movie" });
-    }
+    if (!watched || watched.userId !== req.user.userId)
+      return res.status(403).json({ error: "Not allowed" });
 
     const deleted = await prisma.watched.update({
       where: { id: Number(id) },
       data: { isDeleted: true },
     });
 
-    res.json({ message: "Watched movie removed (soft delete)", deleted });
-  } catch (error) {
-    console.error("Error deleting watched movie:", error);
+    res.json({ message: "Deleted", deleted });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to delete watched movie" });
   }
 });

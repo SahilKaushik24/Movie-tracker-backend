@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -11,61 +8,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  name      String?
-  password  String
-  createdAt DateTime  @default(now())
-  role      String    @default("user")
-
-  watched   Watched[]
-}
-
 model Movie {
-  id          Int     @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   title       String
-  director    String?
-  releaseYear Int?
-  releaseDate DateTime?
-  status      Boolean @default(true)
   overview    String?
+  releaseDate DateTime?
+  releaseYear Int?
+  poster_path String?
   rating      Float?
-  posterPath  String?
   runtime     Int?
   language    String?
   budget      Int?
+  director    String?
+  status      Boolean     @default(true)
 
   movieGenres MovieGenre[]
   watched     Watched[]
 }
 
 model Genre {
-  id     Int     @id @default(autoincrement())
-  name   String
-  status Boolean @default(true)
-
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
   movieGenres MovieGenre[]
 }
 
 model MovieGenre {
-  id      Int     @id @default(autoincrement())
+  id      Int   @id @default(autoincrement())
+  movie   Movie @relation(fields: [movieId], references: [id])
   movieId Int
+  genre   Genre @relation(fields: [genreId], references: [id])
   genreId Int
-  status  Boolean @default(true)
 
-  movie Movie @relation(fields: [movieId], references: [id])
-  genre Genre @relation(fields: [genreId], references: [id])
+  @@unique([movieId, genreId])
 }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  watched   Watched[]
+}
+
 
 model Watched {
   id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
   userId    Int
+  movie     Movie    @relation(fields: [movieId], references: [id])
   movieId   Int
-  rating    Int?
-  createdAt DateTime @default(now())
+  rating    Float?
   isDeleted Boolean  @default(false)
-
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  createdAt DateTime @default(now())
 }

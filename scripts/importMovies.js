@@ -24,22 +24,21 @@ async function importMovies() {
             row.vote_average && !isNaN(row.vote_average)
               ? parseFloat(row.vote_average)
               : null;
-          const runtime =
-            row.runtime && !isNaN(row.runtime) ? parseInt(row.runtime) : null;
-          const budget =
-            row.budget && !isNaN(row.budget) ? parseInt(row.budget) : null;
 
           const movie = {
             title: row.title?.slice(0, 255) || "Untitled",
             overview: row.overview || null,
-            releaseDate: releaseDate,
-            releaseYear: releaseYear,
-            posterPath: row.poster_path || null,
+            releaseDate,
+            releaseYear,
+            poster_path: row.poster_path || null,
             rating,
-            runtime,
+            runtime:
+              row.runtime && !isNaN(row.runtime) ? parseInt(row.runtime) : null,
             language: row.original_language || null,
-            budget,
+            budget:
+              row.budget && !isNaN(row.budget) ? parseInt(row.budget) : null,
             director: row.director || null,
+            status: true,
           };
 
           movies.push(movie);
@@ -75,6 +74,4 @@ async function importMovies() {
   });
 }
 
-importMovies().catch((err) => {
-  console.error("Script failed:", err);
-});
+importMovies().catch((err) => console.error("Script failed:", err));
