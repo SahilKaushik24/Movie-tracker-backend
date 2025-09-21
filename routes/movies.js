@@ -51,11 +51,17 @@ router.put("/:id", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const { title } = req.query;
+    const { title, page = 1, limit = 20 } = req.query;
+
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
+    const skip = (pageNum - 1) * limitNum;
 
     const findManyOptions = {
       where: { status: true },
       include: { movieGenres: { include: { genre: true } } },
+      skip,
+      take: limitNum,
     };
 
     if (title) {
@@ -66,7 +72,18 @@ router.get("/", async (req, res) => {
     }
 
     const movies = await prisma.movie.findMany(findManyOptions);
-    res.json(movies);
+    const totalMovies = await prisma.movie.count({
+      where: findManyOptions.where,
+    });
+    const totalPages = Math.ceil(totalMovies / limitNum);
+
+    res.json({
+      pages: pageNum,
+      limit: limitNum,
+      totalPages,
+      totalMovies,
+      movies,
+    });
   } catch (error) {
     console.error("Error fetching movies:", error);
     res

@@ -26,9 +26,10 @@ model Movie {
   id          Int     @id @default(autoincrement())
   title       String
   director    String?
-  releaseYear Int
+  releaseYear Int?
+  releaseDate DateTime?
   status      Boolean @default(true)
-  overview String?
+  overview    String?
   rating      Float?
   posterPath  String?
   runtime     Int?
