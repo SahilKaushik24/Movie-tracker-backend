@@ -4,42 +4,55 @@ import { PrismaClient } from "../generated/prisma/index.js";
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// utility function to get full poster URL
-function getPosterUrl(path) {
-  if (!path) return "/placeholder.png"; // fallback if no poster
-  return `https://image.tmdb.org/t/p/w500${path}`;
+function getPosterUrl(url) {
+  return url || "/placeholder.png";
 }
 
-// get movies list
 router.get("/", async (req, res) => {
   try {
     const { title, page = 1, limit = 20 } = req.query;
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    const where = { status: true };
-    if (title) where.title = { contains: title, mode: "insensitive" };
+    const where = title
+      ? { title: { contains: title, mode: "insensitive" } }
+      : {};
 
     const movies = await prisma.movie.findMany({
       where,
-      include: { movieGenres: { include: { genre: true } } },
+      include: {
+        movieGenres: {
+          include: { genre: { select: { name: true } } },
+        },
+      },
       skip,
       take: limitNum,
+      orderBy: { title: "asc" },
     });
 
     const totalMovies = await prisma.movie.count({ where });
-    const totalPages = Math.ceil(totalMovies / limitNum);
 
     const moviesWithPoster = movies.map((m) => ({
-      ...m,
-      poster: getPosterUrl(m.poster_path),
+      id: m.id,
+      title: m.title,
+      director: m.director,
+      metaScore: m.metaScore,
+      poster: getPosterUrl(m.posterURL),
+      stars: m.stars,
+      votes: m.votes,
+      writers: m.writers,
+      description: m.description,
+      imdbRating: m.imdbRating,
+      videoURL: m.videoURL,
+      genres: m.movieGenres.map((mg) => mg.genre.name),
+      status: m.status,
     }));
 
     res.json({
-      pages: pageNum,
+      page: pageNum,
       limit: limitNum,
-      totalPages,
+      totalPages: Math.ceil(totalMovies / limitNum),
       totalMovies,
       movies: moviesWithPoster,
     });
@@ -49,59 +62,88 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET movie details
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const movie = await prisma.movie.findUnique({
       where: { id: Number(id) },
-      include: { movieGenres: { include: { genre: true } } },
+      include: {
+        movieGenres: { include: { genre: { select: { name: true } } } },
+      },
     });
 
     if (!movie) return res.status(404).json({ error: "Movie not found" });
 
-    const movieWithPoster = {
-      ...movie,
-      poster: getPosterUrl(movie.poster_path),
-    };
-
-    res.json(movieWithPoster);
+    res.json({
+      id: movie.id,
+      title: movie.title,
+      director: movie.director,
+      metaScore: movie.metaScore,
+      poster: getPosterUrl(movie.posterURL),
+      stars: movie.stars,
+      votes: movie.votes,
+      writers: movie.writers,
+      description: movie.description,
+      imdbRating: movie.imdbRating,
+      videoURL: movie.videoURL,
+      genres: movie.movieGenres.map((mg) => mg.genre.name),
+      status: movie.status,
+    });
   } catch (err) {
     console.error("Error fetching movie:", err);
     res.status(500).json({ error: "Failed to fetch movie" });
   }
 });
 
-// POST new movie
 router.post("/", async (req, res) => {
   try {
-    const { title, director, releaseYear, overview, rating, genres } = req.body;
-    if (!title || !director || !releaseYear)
-      return res.status(400).json({ error: "Missing required fields" });
-
-    const movieData = {
+    const {
       title,
+      description,
+      posterURL,
+      videoURL,
+      imdbRating,
+      votes,
+      metaScore,
       director,
-      releaseYear: Number(releaseYear),
-      overview,
-      rating: rating ? Number(rating) : null,
-      movieGenres: genres?.length
-        ? {
-            create: genres.map((genreId) => ({
-              genre: { connect: { id: genreId } },
-            })),
-          }
-        : undefined,
-    };
+      writers,
+      stars,
+      genres,
+    } = req.body;
+
+    if (!title) return res.status(400).json({ error: "Title is required" });
 
     const newMovie = await prisma.movie.create({
-      data: movieData,
-      include: { movieGenres: { include: { genre: true } } },
+      data: {
+        title,
+        description: description || null,
+        posterURL: posterURL || null,
+        videoURL: videoURL || null,
+        imdbRating: imdbRating ? Number(imdbRating) : null,
+        votes: votes ? Number(votes) : null,
+        metaScore: metaScore ? Number(metaScore) : null,
+        director: director || null,
+        writers: writers || null,
+        stars: stars || null,
+        movieGenres: genres?.length
+          ? {
+              create: genres.map((genreId) => ({
+                genre: { connect: { id: genreId } },
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        movieGenres: { include: { genre: { select: { name: true } } } },
+      },
     });
 
-    res
-      .status(201)
-      .json({ ...newMovie, poster: getPosterUrl(newMovie.poster_path) });
+    res.status(201).json({
+      id: newMovie.id,
+      title: newMovie.title,
+      poster: getPosterUrl(newMovie.posterURL),
+      genres: newMovie.movieGenres.map((mg) => mg.genre.name),
+    });
   } catch (err) {
     console.error("Error creating movie:", err);
     res.status(500).json({ error: "Failed to create movie" });

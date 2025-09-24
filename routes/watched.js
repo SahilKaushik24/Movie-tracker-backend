@@ -1,24 +1,27 @@
 import express from "express";
 import { PrismaClient } from "../generated/prisma/index.js";
 import { authenticateToken } from "../middleware/middleware.js";
-import { getPosterUrl } from "../utils.js";
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// GET watched movies
+function getPosterUrl(url) {
+  return url || "/placeholder.png";
+}
+
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const watchedMovies = await prisma.watched.findMany({
       where: { userId: req.user.userId, isDeleted: false },
       include: { movie: true },
+      orderBy: { createdAt: "desc" },
     });
 
     const moviesWithPoster = watchedMovies.map((w) => ({
       ...w,
       movie: {
         ...w.movie,
-        poster: getPosterUrl(w.movie.poster_path),
+        poster: getPosterUrl(w.movie.posterURL),
       },
     }));
 
@@ -29,10 +32,13 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// POST watched movie
 router.post("/", authenticateToken, async (req, res) => {
   const { movieId, rating } = req.body;
+
+  if (!movieId) return res.status(400).json({ error: "movieId is required" });
+
   try {
+    // Check if already exists
     const existing = await prisma.watched.findFirst({
       where: { userId: req.user.userId, movieId: Number(movieId) },
     });
@@ -60,25 +66,24 @@ router.post("/", authenticateToken, async (req, res) => {
     const movie = await prisma.movie.findUnique({
       where: { id: Number(movieId) },
     });
-    res
-      .status(201)
-      .json({
-        ...watched,
-        movie: { ...movie, poster: getPosterUrl(movie.poster_path) },
-      });
+
+    res.status(201).json({
+      ...watched,
+      movie: { ...movie, poster: getPosterUrl(movie.posterURL) },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to save watched movie" });
   }
 });
 
-// DELETE watched (soft delete)
 router.delete("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
     const watched = await prisma.watched.findUnique({
       where: { id: Number(id) },
     });
+
     if (!watched || watched.userId !== req.user.userId)
       return res.status(403).json({ error: "Not allowed" });
 
@@ -87,7 +92,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       data: { isDeleted: true },
     });
 
-    res.json({ message: "Deleted", deleted });
+    res.json({ message: "Deleted successfully", deleted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete watched movie" });

@@ -9,57 +9,55 @@ datasource db {
 }
 
 model Movie {
-  id          Int         @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   title       String
-  overview    String?
-  releaseDate DateTime?
-  releaseYear Int?
-  poster_path String?
-  rating      Float?
-  runtime     Int?
-  language    String?
-  budget      Int?
   director    String?
-  status      Boolean     @default(true)
-
+  metaScore   Int?
+  posterURL   String?
+  stars       String?
+  votes       Int?
+  writers     String?
+  description String?
+  imdbRating  Float?
+  videoURL    String?
   movieGenres MovieGenre[]
   watched     Watched[]
+  status Boolean @default(true)
 }
 
 model Genre {
-  id          Int         @id @default(autoincrement())
-  name        String      @unique
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
   movieGenres MovieGenre[]
 }
 
 model MovieGenre {
   id      Int   @id @default(autoincrement())
-  movie   Movie @relation(fields: [movieId], references: [id])
   movieId Int
-  genre   Genre @relation(fields: [genreId], references: [id])
   genreId Int
+  genre   Genre @relation(fields: [genreId], references: [id])
+  movie   Movie @relation(fields: [movieId], references: [id])
 
   @@unique([movieId, genreId])
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
   name      String?
   password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  role      String    @default("user")
   watched   Watched[]
 }
 
-
 model Watched {
   id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  movie     Movie    @relation(fields: [movieId], references: [id])
   movieId   Int
   rating    Float?
-  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+  movie     Movie    @relation(fields: [movieId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
