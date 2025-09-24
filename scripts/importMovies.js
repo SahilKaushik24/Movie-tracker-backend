@@ -1,77 +1,96 @@
 import fs from "fs";
+import path from "path";
 import csvParser from "csv-parser";
 import { PrismaClient } from "../generated/prisma/index.js";
 
 const prisma = new PrismaClient();
 
+const filePath = path.resolve(
+  "/home/sahil/Downloads/archive/imdb-top-rated-movies-user-rated.csv"
+);
+
 async function importMovies() {
-  const movies = [];
-  const filePath = "/home/sahil/Downloads/movies_metadata.csv";
+  try {
+    console.log("Importing movies...");
 
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(filePath)
-      .pipe(csvParser())
-      .on("data", (row) => {
-        try {
-          let releaseDate = null;
-          let releaseYear = null;
-          if (row.release_date && !isNaN(Date.parse(row.release_date))) {
-            releaseDate = new Date(row.release_date);
-            releaseYear = releaseDate.getFullYear();
-          }
+    const movies = [];
 
-          const rating =
-            row.vote_average && !isNaN(row.vote_average)
-              ? parseFloat(row.vote_average)
-              : null;
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csvParser())
+        .on("data", (row) => {
+          const title = row["Title"]?.trim();
+          if (!title) return;
 
-          const movie = {
-            title: row.title?.slice(0, 255) || "Untitled",
-            overview: row.overview || null,
-            releaseDate,
-            releaseYear,
-            poster_path: row.poster_path || null,
-            rating,
-            runtime:
-              row.runtime && !isNaN(row.runtime) ? parseInt(row.runtime) : null,
-            language: row.original_language || null,
-            budget:
-              row.budget && !isNaN(row.budget) ? parseInt(row.budget) : null,
-            director: row.director || null,
-            status: true,
-          };
+          movies.push({
+            title,
+            description: row["Description"]?.trim() || null,
+            posterURL: row["Poster URL"]?.trim() || null,
+            videoURL: row["Video URL"]?.trim() || null,
+            imdbRating: row["IMDB Rating"]
+              ? parseFloat(row["IMDB Rating"])
+              : null,
+            votes: row["Votes"]
+              ? parseInt(row["Votes"].replace(/,/g, ""))
+              : null,
+            metaScore: row["MetaScore"] ? parseInt(row["MetaScore"]) : null,
+            director: row["Director"]?.trim() || null,
+            writers: row["Writers"]?.trim() || null,
+            stars: row["Stars"]?.trim() || null,
+            tags: row["Tags"]
+              ? row["Tags"].split(",").map((t) => t.trim())
+              : [],
+          });
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
 
-          movies.push(movie);
-        } catch (err) {
-          console.error("Error parsing row:", err);
+    console.log(`📄 Parsed ${movies.length} movies`);
+
+    for (const m of movies) {
+      try {
+        const movie = await prisma.movie.create({
+          data: {
+            title: m.title,
+            description: m.description,
+            posterURL: m.posterURL,
+            videoURL: m.videoURL,
+            imdbRating: m.imdbRating,
+            votes: m.votes,
+            metaScore: m.metaScore,
+            director: m.director,
+            writers: m.writers,
+            stars: m.stars,
+          },
+        });
+
+        for (const tag of [...new Set(m.tags)]) {
+          const genre = await prisma.genre.upsert({
+            where: { name: tag },
+            update: {},
+            create: { name: tag },
+          });
+
+          await prisma.movieGenre.upsert({
+            where: {
+              movieId_genreId: { movieId: movie.id, genreId: genre.id },
+            },
+            update: {},
+            create: { movieId: movie.id, genreId: genre.id },
+          });
         }
-      })
-      .on("end", async () => {
-        console.log(`Parsed ${movies.length} movies, inserting into DB...`);
-        try {
-          const batchSize = 200;
-          for (let i = 0; i < movies.length; i += batchSize) {
-            const batch = movies.slice(i, i + batchSize);
-            await prisma.movie.createMany({
-              data: batch,
-              skipDuplicates: true,
-            });
-            console.log(`Inserted batch ${i / batchSize + 1}`);
-          }
-          console.log("Import completed!");
-          resolve();
-        } catch (err) {
-          console.error("Error inserting movies:", err);
-          reject(err);
-        } finally {
-          await prisma.$disconnect();
-        }
-      })
-      .on("error", (err) => {
-        console.error("Error reading CSV file:", err);
-        reject(err);
-      });
-  });
+      } catch (err) {
+        console.log(`⚠ Skipped duplicate movie: ${m.title}`);
+      }
+    }
+
+    console.log("✅ Import finished!");
+  } catch (err) {
+    console.error("Error importing movies:", err);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-importMovies().catch((err) => console.error("Script failed:", err));
+await importMovies();
