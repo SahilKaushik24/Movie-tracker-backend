@@ -12,7 +12,6 @@ const csvFilePath = path.resolve(
 async function updateRatings() {
   const moviesToUpdate = [];
 
-  // Step 1: Parse CSV
   await new Promise((resolve, reject) => {
     fs.createReadStream(csvFilePath)
       .pipe(csv())
@@ -32,7 +31,6 @@ async function updateRatings() {
 
   console.log(`Parsed ${moviesToUpdate.length} movies from CSV.`);
 
-  // Step 2: Sequential updates (safe for production)
   for (const m of moviesToUpdate) {
     try {
       const updated = await prisma.movie.updateMany({
@@ -51,7 +49,6 @@ async function updateRatings() {
         console.log(`Movie not found in DB: "${m.title}"`);
       }
 
-      // Optional: small delay to avoid hitting the pool limit
       await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
       console.error(`Error updating "${m.title}":`, err.message || err);
