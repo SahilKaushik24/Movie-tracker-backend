@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { PrismaClient } from "../generated/prisma/index.js";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const OMDB_API_KEY = process.env.OMDB_API_KEY;
